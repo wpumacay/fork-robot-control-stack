@@ -1,7 +1,11 @@
 import logging
+from dataclasses import dataclass
 from time import sleep
+from typing import Literal
 
-from rcs._core.common import RobotPlatform
+import mujoco as mj
+import tyro
+
 from rcs._core.sim import SimConfig
 from rcs.envs.base import (
     ControlMode,
@@ -13,7 +17,6 @@ from rcs.envs.base import (
 )
 from rcs.envs.configs import EmptyWorldXArm7
 from rcs.envs.sim import RobotSimWrapper
-from rcs_xarm7.configs import DefaultXArm7HardwareEnv
 
 import rcs
 from rcs import sim
@@ -26,21 +29,35 @@ The example shows how to create a xArm7 environment with Cartesian control
 and a relative action space. The example works both with a real robot and in
 simulation.
 
-To test with a real robot, set ROBOT_INSTANCE to RobotPlatform.HARDWARE,
+To test with a real robot, pass '--platform hardware' and pass the '--ip YOUR_ROBOT_IP',
 install the rcs_xarm7 extension (`pip install extensions/rcs_xarm7`)
-and set the ROBOT_IP variable to the robot's IP address.
 """
 
-ROBOT_IP = "192.168.1.245"
-ROBOT_INSTANCE = RobotPlatform.SIMULATION
-# ROBOT_INSTANCE = RobotPlatform.HARDWARE
+
+@dataclass
+class Args:
+    platform: Literal["simulation", "hardware"] = "simulation"
+    """The platform to use for this demo ('simulation' | 'hardware')"""
+
+    ip: str = "192.168.1.245"
+    """The IP of the robot hardware platform to connect to"""
+
+    gfx: Literal["vulkan", "opengl", "opengl_software"] = "vulkan"
+    """The graphics API to be used by the experimental filament renderer"""
+
+
+MJ_VERSION = tuple(map(int, mj.__version__.split(".")))
+MJ_USE_FILAMENT = True
 
 
 def main():
+    args = tyro.cli(Args)
 
-    if ROBOT_INSTANCE == RobotPlatform.HARDWARE:
+    if args.platform == "hardware":
+        from rcs_xarm7.configs import DefaultXArm7HardwareEnv
+
         env_creator = DefaultXArm7HardwareEnv()
-        env_creator.ip = ROBOT_IP
+        env_creator.ip = args.ip
         hw_cfg = env_creator.config()
         hw_cfg.control_mode = ControlMode.CARTESIAN_TQuat
         hw_cfg.max_relative_movement = 0.5
@@ -77,21 +94,58 @@ def main():
             relative_to=RelativeTo.LAST_STEP,
         )
         env_rel = CoverWrapper(env_rel)
-        env_rel.get_wrapper_attr("sim").open_gui()
-        sleep(3)  # wait for gui to open
+
+        # # NOTE(wilbert): the mp gui server stuff seems to not play well with the exp-filament stuff
+        # if MJ_VERSION != (3, 16, 1) or not MJ_USE_FILAMENT:
+        #     env_rel.get_wrapper_attr("sim").open_gui()
+        #     sleep(3)  # wait for gui to open
+
     obs, info = env_rel.reset()
 
-    for _ in range(100):
-        for _ in range(10):
-            # move 1cm in x direction (forward) and close gripper
-            act = {"tquat": [0.01, 0, 0, 0, 0, 0, 1]}
-            obs, reward, terminated, truncated, info = env_rel.step(act)
-            sleep(0.6)
-        for _ in range(10):
-            # move 1cm in negative x direction (backward) and open gripper
-            act = {"tquat": [-0.01, 0, 0, 0, 0, 0, 1]}
-            obs, reward, terminated, truncated, info = env_rel.step(act)
-            sleep(0.6)
+    if MJ_VERSION == (3, 16, 1) and MJ_USE_FILAMENT:
+        from mujoco.experimental.studio import launch_passive, step_control, viewer_app, viewer_protocol
+
+        config = viewer_protocol.ViewerConfig(
+            title="RCS MuJoCo viewer",
+            width=1024,
+            height=768,
+            gfx=args.gfx,
+        )
+
+        # sim_plugins = [step_control.StepControl()]
+        # viewer_plugins = [viewer_app.ViewerApp()]
+
+        plugins = [
+            step_control.StepControl(),
+            viewer_app.ViewerApp(),
+        ]
+
+        launch_passive.run(
+            config,
+            model=simulation.model,
+            data=simulation.data,
+            plugins=plugins,
+        )
+
+        # # with launch_passive.launch(config, sim_plugins=sim_plugins, viewer_plugins=viewer_plugins) as viewer:
+        # with launch_passive.launch(config, plugins=[*sim_plugins, *viewer_plugins]) as viewer:
+        #     while viewer.is_running():
+        #         act = {"tquat": [0, 0, 0, 0, 0, 0, 1]}
+        #         _ = env_rel.step(act)
+        #
+        #         viewer.sync()
+    else:
+        for _ in range(100):
+            for _ in range(10):
+                # move 1cm in x direction (forward) and close gripper
+                act = {"tquat": [0.01, 0, 0, 0, 0, 0, 1]}
+                obs, reward, terminated, truncated, info = env_rel.step(act)
+                sleep(0.6)
+            for _ in range(10):
+                # move 1cm in negative x direction (backward) and open gripper
+                act = {"tquat": [-0.01, 0, 0, 0, 0, 0, 1]}
+                obs, reward, terminated, truncated, info = env_rel.step(act)
+                sleep(0.6)
 
 
 if __name__ == "__main__":

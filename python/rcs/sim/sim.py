@@ -26,6 +26,8 @@ from rcs.utils import SimpleFrameRate
 render_context_bootstrap.bootstrap()
 logger = getLogger(__name__)
 
+MJ_VERSION = tuple(map(int, mj.__version__.split(".")))
+MJ_USE_FILAMENT = True
 
 # Target frames per second
 FPS = 60
@@ -54,12 +56,32 @@ def gui_loop(gui_uuid: str, close_event):
     data = mujoco.MjData(model)
     gui_client.set_model_and_data(model._address, data._address)
     mujoco.mj_step(model, data)
-    with mujoco.viewer.launch_passive(model, data) as viewer:
-        while not close_event.is_set():
-            mujoco.mj_step(model, data)
-            viewer.sync()
-            gui_client.sync()
-            frame_rate()
+
+    if MJ_VERSION == (3, 16, 1) and MJ_USE_FILAMENT:
+        from mujoco.experimental.studio import launch_passive, step_control, viewer_app, viewer_protocol
+
+        config = viewer_protocol.ViewerConfig(
+            title="RCS MuJoCo viewer",
+            gfx="opengl_software",
+        )
+
+        sim_plugins = [step_control.StepControl()]
+        viewer_plugins = [viewer_app.ViewerApp()]
+
+        # with launch_passive.launch(config, sim_plugins=sim_plugins, viewer_plugins=viewer_plugins) as viewer:
+        with launch_passive.launch(config, plugins=[*sim_plugins, *viewer_plugins]) as viewer:
+            while not close_event.is_set() and viewer.is_running():
+                model, data = viewer.sync(model, data)
+                mujoco.mj_step(model, data)
+                gui_client.sync()
+                frame_rate()
+    else:
+        with mujoco.viewer.launch_passive(model, data) as viewer:
+            while not close_event.is_set():
+                mujoco.mj_step(model, data)
+                viewer.sync()
+                gui_client.sync()
+                frame_rate()
 
 
 class Sim(_Sim):
