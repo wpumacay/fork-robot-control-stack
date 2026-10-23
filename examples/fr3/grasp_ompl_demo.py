@@ -3,7 +3,7 @@ import pathlib
 from typing import Any, cast
 
 import gymnasium as gym
-import mujoco
+import mujoco as mj
 import numpy as np
 from rcs._core.common import Pose, RobotType
 from rcs._core.sim import SimRobot
@@ -55,7 +55,7 @@ class OmplTrajectoryDemo:
         model = self.env.get_wrapper_attr("sim").model
         data = self.env.get_wrapper_attr("sim").data
 
-        geom_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, geom_name)
+        geom_id = mj.mj_name2id(model, mj.mjtObj.mjOBJ_GEOM, geom_name)
         obj_pose_world_coordinates = Pose(
             translation=data.geom_xpos[geom_id], rotation=data.geom_xmat[geom_id].reshape(3, 3)
         ) * Pose(rpy_vector=np.array([0, 0, np.pi]), translation=np.array([0.0, 0.0, 0.0]))
@@ -65,7 +65,8 @@ class OmplTrajectoryDemo:
         self.move_home()
         obj_pose_og = self.get_object_pose(geom_name=obj_name)
         obj_pose = obj_pose_og * Pose(
-            translation=np.array([0, 0, delta_up]), quaternion=np.array([1, 0, 0, 0])  # type: ignore
+            translation=np.array([0, 0, delta_up]),
+            quaternion=np.array([1, 0, 0, 0]),  # type: ignore
         )  # type: ignore
         goal_q = self.planner.ik(obj_pose, None)
         if goal_q is None:

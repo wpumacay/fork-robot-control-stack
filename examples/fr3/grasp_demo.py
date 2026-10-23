@@ -3,7 +3,7 @@ from time import sleep
 from typing import Any, cast
 
 import gymnasium as gym
-import mujoco
+import mujoco as mj
 import numpy as np
 from rcs._core.common import Pose
 from rcs._core.sim import SimRobot
@@ -29,7 +29,7 @@ class PickUpDemo:
         model = self.env.get_wrapper_attr("sim").model
         data = self.env.get_wrapper_attr("sim").data
 
-        geom_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, geom_name)
+        geom_id = mj.mj_name2id(model, mj.mjtObj.mjOBJ_GEOM, geom_name)
         obj_pose_world_coordinates = Pose(
             translation=data.geom_xpos[geom_id], rotation=data.geom_xmat[geom_id].reshape(3, 3)
         ) * Pose(rpy_vector=np.array([0, 0, np.pi]), translation=np.array([0.0, 0.0, 0.0]))
@@ -109,4 +109,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

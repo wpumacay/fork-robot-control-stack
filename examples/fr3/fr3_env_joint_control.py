@@ -1,8 +1,10 @@
 import logging
+from dataclasses import dataclass
+from typing import Literal
 
 import gymnasium as gym
 import numpy as np
-from rcs._core.common import RobotPlatform
+import tyro
 from rcs._core.sim import SimConfig
 from rcs.camera.sim import SimCameraSet
 from rcs.envs.base import (
@@ -36,12 +38,20 @@ put it into FCI mode before running this script. For a scripted way of unlocking
 fr3_direct_control.py example which uses the FCI context manager.
 """
 
-ROBOT_INSTANCE = RobotPlatform.SIMULATION
-FR3_IP = "192.168.101.1"
+
+@dataclass
+class Args:
+    platform: Literal["simulation", "hardware"] = "simulation"
+    """The platform to use for this demo ('simulation' | 'hardware')"""
+
+    ip: str = "192.168.101.1"
+    """The IP of the robot hardware platform to connect to"""
 
 
 def main():
-    if ROBOT_INSTANCE == RobotPlatform.SIMULATION:
+    args = tyro.cli(Args)
+
+    if args.platform == "simulation":
         scene = EmptyWorldFR3()
         cfg = scene.prefixed_cfg(scene.config())
         fr3 = scene.lead_robot_name(cfg)
@@ -109,4 +119,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

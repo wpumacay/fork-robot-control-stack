@@ -1,0 +1,4 @@
+[environment]
+extra-paths = [
+    "./typings/",
+]

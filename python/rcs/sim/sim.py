@@ -27,7 +27,7 @@ render_context_bootstrap.bootstrap()
 logger = getLogger(__name__)
 
 MJ_VERSION = tuple(map(int, mj.__version__.split(".")))
-MJ_USE_FILAMENT = True
+MJ_USE_FILAMENT = False
 
 # Target frames per second
 FPS = 60
